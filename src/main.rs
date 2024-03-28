@@ -40,6 +40,8 @@ async fn localizer_task(
 
     let delta_time = delta_milli as f32 * 10e-4;
 
+    let mut prev_accel = rust_imu_utils::convert_to_vector(0.0, 0.0, 0.0);
+
     pr_info!(log, "Init EKF");
     let mut ekf = rust_imu_utils::ekf::Axis6EKF::new(delta_time);
 
@@ -65,18 +67,22 @@ async fn localizer_task(
         
         pr_info!(log, "value:{}", fixed(x));
 
-        odom.pose.pose.position.x += odom.twist.twist.linear.x * delta_time as f64 + 0.5*(fixed(x)*delta_time.powi(2)) as f64;
-        odom.pose.pose.position.y += odom.twist.twist.linear.y * delta_time as f64 + 0.5*(fixed(y)*delta_time.powi(2)) as f64;
+        odom.twist.twist.linear.x = ((fixed(x) + prev_accel.x)*delta_time) as f64;
+        odom.twist.twist.linear.y = ((fixed(y) + prev_accel.y)*delta_time) as f64;
+        odom.twist.twist.linear.z = ((fixed(z) + prev_accel.z)*delta_time) as f64;
+
+        odom.pose.pose.position.x += odom.twist.twist.linear.x * delta_time as f64;
+        odom.pose.pose.position.y += odom.twist.twist.linear.y * delta_time as f64;
         odom.pose.pose.position.z += 0.0;
-        odom.twist.twist.linear.x += (fixed(x)*delta_time) as f64;
-        odom.twist.twist.linear.y += (fixed(y)*delta_time) as f64;
-        odom.twist.twist.linear.z += (fixed(z)*delta_time) as f64;
         odom.pose.pose.orientation.w = q.w as f64;
         odom.pose.pose.orientation.x = q.i as f64;
         odom.pose.pose.orientation.y = q.j as f64;
         odom.pose.pose.orientation.z = q.k as f64;
 
         let _ = pub_odom.send(&odom);
+        prev_accel.x = x;
+        prev_accel.y = y;
+        prev_accel.z = z;
 
         std::thread::sleep(std::time::Duration::from_millis(delta_milli));
     }
