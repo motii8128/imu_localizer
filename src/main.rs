@@ -8,7 +8,7 @@ use safe_drive::{
     msg::RosString
 };
 use async_std;
-use ekf_utils;
+use rust_imu_utils;
 
 
 #[async_std::main]
@@ -41,33 +41,36 @@ async fn localizer_task(
     let delta_time = delta_milli as f32 * 10e-4;
 
     pr_info!(log, "Init EKF");
-    let mut ekf = ekf_utils::posture::Axis6EKF::new(delta_time);
+    let mut ekf = rust_imu_utils::ekf::Axis6EKF::new(delta_time);
 
     pr_info!(log, "Start IMULocalizer:interval:{}ms pub:{} sub:{}", delta_milli, pub_odom.get_topic_name(), sub_imu.get_topic_name());
     loop {
         let get_imu = sub_imu.recv().await.unwrap();
 
-        let gyro_velocity = ekf_utils::convert_to_vector(
+        let gyro_velocity = rust_imu_utils::convert_to_vector(
             get_imu.angular_velocity.x.to_radians() as f32, 
             get_imu.angular_velocity.y.to_radians() as f32, 
             get_imu.angular_velocity.z.to_radians() as f32);
 
-        let linear_accel = ekf_utils::convert_to_vector(
+        let linear_accel = rust_imu_utils::convert_to_vector(
             get_imu.linear_acceleration.x as f32, 
             get_imu.linear_acceleration.y as f32, 
             get_imu.linear_acceleration.z as f32);
 
         let result = ekf.run_ekf(gyro_velocity, linear_accel, delta_time);
-        let q = ekf_utils::xyz_to_quaternion(result);
+        let q = rust_imu_utils::xyz_to_quaternion(result);
 
-        let (x, y, z) = ekf_utils::remove_gravity_from_euler(result, 0.981);
+        let (x, y, z) = rust_imu_utils::remove_gravity_from_euler(linear_accel,result, 0.981);
 
-        odom.pose.pose.position.x += odom.twist.twist.linear.x*(delta_time as f64) + 0.5*((linear_accel.x + x)*delta_time.powi(2)) as f64;
-        odom.pose.pose.position.y += odom.twist.twist.linear.y*(delta_time as f64) + 0.5*((linear_accel.y + y)*delta_time.powi(2)) as f64;
-        odom.pose.pose.position.z += odom.twist.twist.linear.z*(delta_time as f64) + 0.5*((linear_accel.z + z)*delta_time.powi(2)) as f64;
-        odom.twist.twist.linear.x += (x*delta_time) as f64;
-        odom.twist.twist.linear.y += (y*delta_time) as f64;
-        odom.twist.twist.linear.z += (z*delta_time) as f64;
+        
+        pr_info!(log, "value:{}", fixed(x));
+
+        odom.pose.pose.position.x += odom.twist.twist.linear.x * delta_time as f64 + 0.5*(fixed(x)*delta_time.powi(2)) as f64;
+        odom.pose.pose.position.y += odom.twist.twist.linear.y * delta_time as f64 + 0.5*(fixed(y)*delta_time.powi(2)) as f64;
+        odom.pose.pose.position.z += 0.0;
+        odom.twist.twist.linear.x += (fixed(x)*delta_time) as f64;
+        odom.twist.twist.linear.y += (fixed(y)*delta_time) as f64;
+        odom.twist.twist.linear.z += (fixed(z)*delta_time) as f64;
         odom.pose.pose.orientation.w = q.w as f64;
         odom.pose.pose.orientation.x = q.i as f64;
         odom.pose.pose.orientation.y = q.j as f64;
@@ -76,5 +79,16 @@ async fn localizer_task(
         let _ = pub_odom.send(&odom);
 
         std::thread::sleep(std::time::Duration::from_millis(delta_milli));
+    }
+}
+
+fn fixed(value:f32)->f32
+{
+    if value.abs() < 0.3
+    {
+        0.0
+    }
+    else {
+        value
     }
 }

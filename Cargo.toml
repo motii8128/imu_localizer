@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 safe_drive = "0.3.5"
 async-std = { version = "1", features = ["attributes"] }
-ekf_utils = {git = "https://github.com/motii8128/ekf_utils.git"}
+rust_imu_utils = {git = "https://github.com/motii8128/rust_imu_utils.git"}
 
 [package.metadata.ros]
 safe_drive_version = "0.3.5"
