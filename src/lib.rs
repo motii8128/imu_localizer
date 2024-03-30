@@ -20,6 +20,7 @@ pub async fn imu_localizer_task(
     let delta_time = delta_milli as f64 * 10e-4;
 
     let mut prev_velocity = rust_imu_utils::convert_to_vector(0.0, 0.0, 0.0);
+    let mut prev_accel = rust_imu_utils::convert_to_vector(0.0, 0.0, 0.0);
     let mut ekf = rust_imu_utils::ekf::Axis6EKF::new(delta_time);
     let mut odom = nav_msgs::msg::Odometry::new().unwrap();
     odom.header.frame_id = RosString::new(odom_frame_id).unwrap();
@@ -46,13 +47,15 @@ pub async fn imu_localizer_task(
         gravity_removed.y = noise_filter(gravity_removed.y, 0.1);
         gravity_removed.z = noise_filter(gravity_removed.z, 0.1);
 
-        odom.pose.pose.position.x += prev_velocity.y * delta_time + 0.5 * gravity_removed.y * delta_time.powi(2);
-        odom.pose.pose.position.y += prev_velocity.x * delta_time + 0.5 * gravity_removed.x * delta_time.powi(2);
-        odom.pose.pose.position.z += 0.0;
+        
+        odom.twist.twist.linear.x = (gravity_removed.x + prev_accel.x)* delta_time * 0.5;
+        odom.twist.twist.linear.y = (gravity_removed.y + prev_accel.y)* delta_time * 0.5;
+        odom.twist.twist.linear.z = (gravity_removed.z + prev_accel.z)* delta_time * 0.5;
+        odom.pose.pose.position.x += (odom.twist.twist.linear.y + prev_velocity.y) * delta_time * 0.5;
+        odom.pose.pose.position.y -= (odom.twist.twist.linear.x + prev_velocity.x) * delta_time * 0.5;
+        odom.pose.pose.position.z = 0.0;
 
         pr_info!(log, "{}", odom.pose.pose.position.y);
-
-        prev_velocity = gravity_removed * delta_time;
 
         odom.pose.pose.orientation.w = estimated_quaternion.w;
         odom.pose.pose.orientation.x = estimated_quaternion.i;
@@ -61,7 +64,12 @@ pub async fn imu_localizer_task(
 
         let _ = pub_odom.send(&odom).unwrap();
 
-         
+        prev_velocity.x = odom.twist.twist.linear.x;
+        prev_velocity.y = odom.twist.twist.linear.y;
+        prev_velocity.z = odom.twist.twist.linear.z;
+        prev_accel.x = gravity_removed.x;
+        prev_accel.y = gravity_removed.y;
+        prev_accel.z = gravity_removed.z;
 
         std::thread::sleep(std::time::Duration::from_millis(delta_milli));
     }
