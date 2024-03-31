@@ -25,7 +25,7 @@ pub async fn imu_localizer_task(
     let mut odom = nav_msgs::msg::Odometry::new().unwrap();
     odom.header.frame_id = RosString::new(odom_frame_id).unwrap();
 
-    pr_info!(log, "Start ImuLocalizer. set interval {}s", delta_time);
+    pr_info!(log, "Start ImuLocalizer. Param delta time:{}, frame_id:{}", delta_time, odom_frame_id);
     loop {
         let imu = sub_imu.recv().await.unwrap();
 
@@ -51,6 +51,7 @@ pub async fn imu_localizer_task(
         odom.twist.twist.linear.x = (gravity_removed.x + prev_accel.x)* delta_time * 0.5;
         odom.twist.twist.linear.y = (gravity_removed.y + prev_accel.y)* delta_time * 0.5;
         odom.twist.twist.linear.z = (gravity_removed.z + prev_accel.z)* delta_time * 0.5;
+
         odom.pose.pose.position.x += (odom.twist.twist.linear.y + prev_velocity.y) * delta_time * 0.5;
         odom.pose.pose.position.y -= (odom.twist.twist.linear.x + prev_velocity.x) * delta_time * 0.5;
         odom.pose.pose.position.z = 0.0;
