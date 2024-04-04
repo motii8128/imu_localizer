@@ -1,6 +1,6 @@
 [package]
 name = "imu_localizer"
-version = "1.0.0"
+version = "1.2.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -9,6 +9,7 @@ edition = "2021"
 safe_drive = "0.3.5"
 async-std = { version = "1", features = ["attributes"] }
 rust_imu_utils = {git = "https://github.com/motii8128/rust_imu_utils.git"}
+ros2_rust_util = {git = "https://github.com/TakanoTaiga/ros2_rust_util.git"}
 
 [package.metadata.ros]
 safe_drive_version = "0.3.5"
