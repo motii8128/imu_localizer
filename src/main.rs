@@ -18,8 +18,8 @@ async fn main()->Result<(), DynError>
     let pub_odom = node.create_publisher::<nav_msgs::msg::Odometry>("/odom", None)?;
     let pub_euler = node.create_publisher::<geometry_msgs::msg::Vector3>("/euler", None)?;
 
-    let delta_time = get_i64_parameter(node.get_name(), "delta_milli", 10) as u64;
-    let odom_frame_id = get_str_parameter(node.get_name(), "odom_frame_id", "odom");
+    let delta_time = get_i64_parameter(node.get_name().unwrap().as_str(), "delta_milli", 10) as u64;
+    let odom_frame_id = get_str_parameter(node.get_name().unwrap().as_str(), "odom_frame_id", "odom");
 
 
     let task = async_std::task::spawn(imu_localizer_task(sub_imu, pub_odom, pub_euler, delta_time, odom_frame_id));
